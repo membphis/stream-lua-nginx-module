@@ -219,6 +219,39 @@ do
     ns_records = concat(bits)
 end
 
+local agentzh_org = _encode_name("agentzh.org")
+
+local ns_agentzh_org_records
+do
+    local bits = {}
+    local idx = 0
+    local ns_servers = {"a.restydns.com", "c.restydns.com"}
+    for _, srv in ipairs(ns_servers) do
+        local auth_ns = _encode_name(srv)
+
+        local len = #auth_ns
+        local len_hi = char(rshift(len, 8))
+        local len_lo = char(band(len, 0xff))
+
+        idx = idx + 1
+        bits[idx] = agentzh_org
+
+        idx = idx + 1
+        bits[idx] = "\0\2\0\x01\0\0\2\x58"
+
+        idx = idx + 1
+        bits[idx] = len_hi
+
+        idx = idx + 1
+        bits[idx] = len_lo
+
+        idx = idx + 1
+        bits[idx] = auth_ns
+    end
+
+    ns_agentzh_org_records = concat(bits)
+end
+
 local regdoms = {
 	['openresty.org'] = "openresty.org",
 	['qa.openresty.org'] = "openresty.org",
@@ -340,6 +373,37 @@ do
     txt_records = concat(bits)
 end
 
+local txt_agentzh_org_records
+do
+    local bits = {}
+    local idx = 0
+
+    idx = idx + 1
+    bits[idx] = agentzh_org
+
+    idx = idx + 1
+    bits[idx] = "\0\x10\0\x01\0\0\x0e\x10"
+
+    local data = "v=spf1 a mx ~all"
+    local len = #data + 1
+    local len_hi = char(rshift(len, 8))
+    local len_lo = char(band(len, 0xff))
+
+    idx = idx + 1
+    bits[idx] = len_hi
+
+    idx = idx + 1
+    bits[idx] = len_lo
+
+    idx = idx + 1
+    bits[idx] = char(len - 1)
+
+    idx = idx + 1
+    bits[idx] = data
+
+    txt_agentzh_org_records = concat(bits)
+end
+
 local opm_txt_records
 do
     local bits = {}
@@ -452,6 +516,57 @@ do
     soa_records = concat(bits)
 end
 
+local soa_agentzh_org_records = {}
+
+do
+    local bits = {}
+    local idx = 0
+
+    for i, mname in ipairs{"a.restydns.com", "c.restydns.com"} do
+        mname = _encode_name(mname)
+        local rname = _encode_name("agentzh.gmail.com")
+
+        idx = idx + 1
+        bits[idx] = agentzh_org
+
+        idx = idx + 1
+        bits[idx] = "\0\x06\0\x01\0\0\0\x3c"
+
+        local len = #mname + #rname + 5 * 4
+        local len_hi = char(rshift(len, 8))
+        local len_lo = char(band(len, 0xff))
+
+        idx = idx + 1
+        bits[idx] = len_hi
+
+        idx = idx + 1
+        bits[idx] = len_lo
+
+        idx = idx + 1
+        bits[idx] = mname
+
+        idx = idx + 1
+        bits[idx] = rname
+
+        idx = idx + 1
+        bits[idx] = "\x06\x33\xa1\x34"
+
+        idx = idx + 1
+        bits[idx] = "\0\0\x03\x84"
+
+        idx = idx + 1
+        bits[idx] = "\0\0\x03\x84"
+
+        idx = idx + 1
+        bits[idx] = "\0\0\x07\x08"
+
+        idx = idx + 1
+        bits[idx] = "\0\0\0\x3c"
+    end
+
+    soa_agentzh_org_records = concat(bits)
+end
+
 local additional_records
 do
     local bits = {}
@@ -542,6 +657,25 @@ local function send_txt_ans(id, sock, qname, raw_quest_rr, raw_quest_name)
             raw_quest_rr,
             opm_txt_records2,
             ns_records,
+            additional_records,
+        }
+
+        local ok, err = sock:send(tb)
+        if not ok then
+            ngx.log(ngx.ERR, "failed to send: ", err)
+            return
+        end
+
+        return
+    end
+
+    if qname == "agentzh.org" then
+        local tb = {
+            ident_hi, ident_lo,
+            "\x84\0\0\1\0\1\0\2\0\2",
+            raw_quest_rr,
+            txt_agentzh_org_records,
+            ns_agentzh_org_records,
             additional_records,
         }
 
@@ -826,11 +960,11 @@ function _M.go()
 
     -- print("quest_name: ", quest_qname)
 
-    if re_find(quest_qname, [[(?:agentzh|iscribblet|sregex)\.org$]], "jo") then
+    if re_find(quest_qname, [[(?:iscribblet|sregex)\.org$]], "jo") then
         return send_a_ans(id, sock, quest_qname, raw_quest_rr, raw_quest_name)
     end
 
-    if not re_find(quest_qname, [[openresty\.org$]], "jo") then
+    if not re_find(quest_qname, [[(?:agentzh|openresty)\.org$]], "jo") then
         ngx.log(ngx.ERR, "out of zone domain in query: ", quest_qname)
         return send_refused_ans(id, sock, raw_quest_rr)
     end
