@@ -620,6 +620,11 @@ local function send_soa_ans(id, sock, qname, raw_quest_rr, raw_quest_name)
     soa_resp_tb[6] = ns_records
     soa_resp_tb[7] = additional_records
 
+    if qname == "agentzh.org" then
+        soa_resp_tb[5] = soa_agentzh_org_records
+        soa_resp_tb[6] = ns_agentzh_org_records
+    end
+
     local ok, err = sock:send(soa_resp_tb)
     if not ok then
         ngx.log(ngx.ERR, "failed to send: ", err)
@@ -805,6 +810,10 @@ local function send_cname_ans(id, sock, qname, raw_quest_rr, raw_quest_name,
     cname_resp_tb[9] = cname
     cname_resp_tb[10] = ns_records
     cname_resp_tb[11] = additional_records
+
+    if qname == "agentzh.org" then
+        cname_resp_tb[10] = ns_agentzh_org_records
+    end
 
     local ok, err = sock:send(cname_resp_tb)
     if not ok then
